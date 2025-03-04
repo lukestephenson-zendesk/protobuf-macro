@@ -1,8 +1,8 @@
+package application
 
-import conversion.SourceLocation
-import models.{DeepUserMappings, DeepUserMappings3, DeepUserMappings4, Mappings, Mappings2}
-import protobuf.User as ProtoUser
-import protobuf.Address as ProtoAddress
+import application.models.*
+import application.protobuf.{Address as ProtoAddress, User as ProtoUser}
+import framework.conversion.SourceLocation
 
 object Runner {
   def main(args: Array[String]): Unit = {

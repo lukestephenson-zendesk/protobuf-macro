@@ -1,4 +1,4 @@
-package conversion
+package framework.conversion
 
 import scala.quoted.{Expr, Quotes}
 

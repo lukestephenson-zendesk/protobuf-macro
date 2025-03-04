@@ -1,10 +1,8 @@
-package models
+package application.models
 
-import conversion.SourceLocation
-import models.Mappings.expected
-import protobuf.User as ProtoUser
-
+import framework.conversion.SourceLocation
 import scala.quoted.{Expr, Quotes}
+import application.protobuf.{User => ProtoUser}
 
 case class Error(message: String, path: List[SourceLocation]) // NonEmptyList[String] ideally
 

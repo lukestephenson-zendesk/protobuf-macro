@@ -1,20 +1,14 @@
-package models
+package application.models
 
-import scala.quoted.*
-import conversion.{ SourceLocation}
-import models.Mappings.expected
-import protobuf.User as ProtoUser
-import protobuf.Address as ProtoAddress
-
+import framework.conversion.SourceLocation
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
-import scala.quoted.{Expr, Quotes, Type}
+import scala.quoted.*
+import application.protobuf.{User => ProtoUser, Address => ProtoAddress}
 
 case class Address(street: String, city: String)
 
 case class DeepUser(name: String, age: Int, address: Address)
-
-case class DeepUser2(name: String, age: Int, address: Address, address2: Address)
 
 object DeepUserMappings {
 
