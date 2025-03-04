@@ -16,19 +16,6 @@ object Field:
       case (EmptyTuple, EmptyTuple) => EmptyTuple
       case (labelHead *: labelTail, typeHead *: typeTail) => Field[labelHead, typeHead] *: FromLabelsAndTypes[labelTail, typeTail]
 
-  type TypeForLabel[Label <: String, Fields <: Tuple] =
-    Fields match
-      case Field[Label, tpe] *: _ => tpe
-      case _ *: tail => TypeForLabel[Label, tail]
-      case EmptyTuple => Nothing
-
-  type DropByLabel[Label <: String, Fields <: Tuple] <: Tuple =
-    Fields match
-      case EmptyTuple => EmptyTuple
-      case Field[Label, _] *: tail => tail
-      case head *: tail => head *: DropByLabel[Label, tail]
-
-
 opaque type FieldName = String
 
 object FieldName:
@@ -41,14 +28,14 @@ object FieldName:
 
 object DerivedMapper {
 
-  inline def labels[Labels <: Tuple]: List[FieldName] =
+  private inline def labels[Labels <: Tuple]: List[FieldName] =
     inline erasedValue[Labels] match
       case _: EmptyTuple => List.empty
       case _: (h *: t) =>
         constValue[h].asInstanceOf[FieldName] :: labels[t]
 
 
-  inline def transformerForField[
+  private inline def transformerForField[
     ToLabel <: String,
     ToType,
     FromFields <: Tuple
@@ -62,14 +49,14 @@ object DerivedMapper {
         transformerForField[ToLabel, ToType, tail]
     }
 
-  inline def transformersForAllFields[FromFields <: Tuple, ToFields <: Tuple]: Map[FieldName, Mapper[?, ?]] =
+  private inline def transformersForAllFields[FromFields <: Tuple, ToFields <: Tuple]: Map[FieldName, Mapper[?, ?]] =
     inline erasedValue[ToFields] match
       case _: EmptyTuple =>
         Map.empty
       case _: (Field[label, tpe] *: tail) =>
         transformersForAllFields[FromFields, tail] + transformerForField[label, tpe, FromFields]
 
-  inline def unsafeConstructInstance[To](from: Product)(unsafeMapper: (Map[String, ?], FieldName) => Either[Error, ?])(using To: Mirror.ProductOf[To]): Either[Error, To] =
+  private inline def unsafeConstructInstance[To](from: Product)(unsafeMapper: (Map[String, ?], FieldName) => Either[Error, ?])(using To: Mirror.ProductOf[To]): Either[Error, To] =
     val labelsToValuesOfFrom: Map[String, Any] = FieldName.wrapAll(from.productElementNames.zip(from.productIterator).toMap)
     val labelIndicesOfTo: Map[FieldName, Int] = labels[To.MirroredElemLabels].zipWithIndex.toMap
     val valueArrayOfTo: Array[Any] = new Array[Any](labelIndicesOfTo.size)
@@ -87,6 +74,7 @@ object DerivedMapper {
     if failed eq null then Right(To.fromProduct(Tuple.fromArray(valueArrayOfTo)))
     else failed.asInstanceOf[Either[Error, To]]
 
+  // TODO fix compiler warning here
   inline def derived[From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] =
     new Mapper[From, To]:
       override def map(from: From)(using sourceLocation: SourceLocation): Either[Error,To] =
@@ -114,4 +102,16 @@ object DeepUserMappings4 {
   def fromProto(source2: ProtoUser): Either[Error, DeepUser] = {
     source2.as[DeepUser]
   }
+}
+
+object FailuresExample {
+  //  // Demo additional fields failure at compilation time
+  //  case class DeepUserAdditionalFields(name: String, age: Int, address: Address, email: String)
+  //
+  //  given Mapper[ProtoUser, DeepUserAdditionalFields] = DerivedMapper.derived
+  //
+  //  // Demo unhandled field type failure at compilation time
+  //  case class DeepUserUnhandledConversion(name: String, age: Long)
+  //
+  //  given Mapper[ProtoUser, DeepUserUnhandledConversion] = DerivedMapper.derived
 }
