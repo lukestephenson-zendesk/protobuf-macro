@@ -1,4 +1,5 @@
-import models.{DeepUserMappings, DeepUserMappings3, Mappings, Mappings2}
+
+import models.{DeepUserMappings, DeepUserMappings3, DeepUserMappings4, Mappings, Mappings2}
 import source.User as ProtoUser
 import source.Address as ProtoAddress
 
@@ -24,7 +25,10 @@ object Runner {
     val errorOrUser5 = DeepUserMappings3.fromProto(protoUser4)
     println("User5 " + errorOrUser5)
 
+    val errorOrUser6 = DeepUserMappings4.fromProto(protoUser4)
+    println("User6 " + errorOrUser6)
+
     val helloVal = "Hello"
-    println(Mappings.small(helloVal))
+    println(Mappings.sourceCode(helloVal))
   }
 }

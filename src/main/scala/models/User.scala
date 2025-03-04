@@ -19,7 +19,7 @@ object Mappings {
   }
 
   inline def expected[T](inline value: Option[T]): Either[Error, T] = {
-    val path = small(value)
+    val path = sourceCode(value)
 
     value match {
       case Some(v) => Right(v)
@@ -27,8 +27,8 @@ object Mappings {
     }
   }
 
-  inline def small(inline value: Any): String =
-    ${Conversions.errorMessage('value)}
+  inline def sourceCode(inline value: Any): String =
+    ${Conversions.sourceCode('value)}
 
 }
 
