@@ -1,6 +1,6 @@
 package application
 
-import application.conversions.{DeepUserMappings, DeepUserMappings3}
+import application.conversions.{DeepUserMappings, DeepUserMappings3, DeepUserMappings4}
 import application.models.*
 import application.protobuf.{Address as ProtoAddress, User as ProtoUser}
 import framework.conversion.SourceLocation

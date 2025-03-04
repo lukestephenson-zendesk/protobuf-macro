@@ -1,16 +1,17 @@
 package application.conversions
 
-import application.models.{Address, DeepUser, Mapper}
-import framework.conversion.SourceLocation
-
-import scala.compiletime.{constValue, erasedValue, error, summonInline}
-import scala.deriving.Mirror
-import scala.quoted.*
+import application.models.{Address, DeepUser}
 import application.protobuf.{Address as ProtoAddress, User as ProtoUser}
+import framework.conversion.SourceLocation
 import framework.model.Error
 
-object DeepUserMappings3 {
+import scala.compiletime.{constValue, erasedValue, error, summonInline}
 
+trait Mapper[T, S] {
+  def map(value: T)(using sourceLocation: SourceLocation): Either[Error, S]
+}
+
+object Mapper {
   given idMapper[A]: Mapper[A, A] with {
     def map(value: A)(using sourceLocation: SourceLocation): Either[Error, A] = Right(value)
   }
@@ -21,15 +22,19 @@ object DeepUserMappings3 {
       case None => Left(Error("Unable to find value.", List(sourceLocation)))
     }
   }
-  
+
   extension [T](inline value: T) {
     inline def as[S](using mapper: Mapper[T, S]): Either[Error, S] = {
       given SourceLocation = SourceLocation(value)
-      
+
       mapper.map(value)
     }
   }
+}
 
+object DeepUserMappings3 {
+  import application.conversions.Mapper.as
+  
   given addressMapper: Mapper[ProtoAddress, Address] with {
     def map(source: ProtoAddress)(using sourceLocation: SourceLocation): Either[Error, Address] =
       for {

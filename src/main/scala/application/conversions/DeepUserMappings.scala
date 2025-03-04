@@ -1,10 +1,10 @@
 package application.conversions
 
+import application.models.Mappings.expected
 import application.models.{Address, DeepUser, Mappings}
 import application.protobuf.{Address as ProtoAddress, User as ProtoUser}
 import framework.conversion.SourceLocation
 import framework.model.Error
-import Mappings.expected
 
 object DeepUserMappings {
 

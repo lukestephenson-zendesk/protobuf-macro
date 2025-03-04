@@ -1,8 +1,7 @@
 package application.models
 
+import application.protobuf.User as ProtoUser
 import framework.conversion.SourceLocation
-import scala.quoted.{Expr, Quotes}
-import application.protobuf.{User => ProtoUser}
 import framework.model.Error
 
 case class User(name: String, age: Int)
