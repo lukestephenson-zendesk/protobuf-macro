@@ -2,7 +2,7 @@ package conversion
 
 import scala.quoted.{Expr, Quotes}
 
-object Conversions {
+object SourceCodeUtil {
   def sourceCode(expr: Expr[Any])(using quotes: Quotes): Expr[String] = {
     import quotes.reflect._
 

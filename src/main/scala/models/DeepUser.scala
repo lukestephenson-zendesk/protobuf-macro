@@ -1,10 +1,10 @@
 package models
 
 import scala.quoted.*
-import conversion.Conversions
+import conversion.{ SourceLocation}
 import models.Mappings.expected
-import source.User as ProtoUser
-import source.Address as ProtoAddress
+import protobuf.User as ProtoUser
+import protobuf.Address as ProtoAddress
 
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
@@ -14,11 +14,13 @@ case class Address(street: String, city: String)
 
 case class DeepUser(name: String, age: Int, address: Address)
 
+case class DeepUser2(name: String, age: Int, address: Address, address2: Address)
+
 object DeepUserMappings {
 
   extension [T, S](value: Option[T]) {
     inline def expectedWith(fn: T => Either[Error, S]): Either[Error, S] = {
-      val path = Mappings.sourceCode(value)
+      val path = SourceLocation(value)
       val errorOrProto: Either[Error, T] = Mappings.expected(value)
 
       errorOrProto.flatMap { proto =>
@@ -41,10 +43,6 @@ object DeepUserMappings {
       address <- source2.address.expectedWith(fromAddressProto)
     } yield DeepUser(name, age, address)
   }
-}
-
-trait SourceLocation {
-  def sourceLocation: String
 }
 
 trait Mapper[T, S] {
@@ -98,7 +96,7 @@ object Mapper {
   ]: (FieldName, Mapper[?, ?]) =
     inline erasedValue[FromFields] match {
       case _: EmptyTuple =>
-        error("Transformer not found for field '" + constValue[ToLabel] + "'")
+        error("Mapper not found for field '" + constValue[ToLabel] + "'")
       case _: (Field[ToLabel, fromType] *: _) =>
         FieldName.fromLiteralLabel[ToLabel] -> summonInline[Mapper[fromType, ToType]]
       case _: (_ *: tail) =>
@@ -130,18 +128,18 @@ object Mapper {
     if failed eq null then Right(To.fromProduct(Tuple.fromArray(valueArrayOfTo)))
     else failed.asInstanceOf[Either[Error, To]]
 
-  inline given [From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] =
-    new Mapper[From, To]:
-      override def map(from: From)(using sourceLocation: SourceLocation): Either[Error,To] =
-        val transformers = transformersForAllFields[
-          Field.FromLabelsAndTypes[A.MirroredElemLabels, A.MirroredElemTypes],
-          Field.FromLabelsAndTypes[B.MirroredElemLabels, B.MirroredElemTypes]
-        ]
-        unsafeConstructInstance(from) { (labelsToValuesOfA, label) =>
-          transformers(label)
-            .asInstanceOf[Mapper[Any, Any]]
-            .map(labelsToValuesOfA(label.toString)) // TODO create a new SourceLocation based on the label
-        }
+//  inline given [From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] =
+//    new Mapper[From, To]:
+//      override def map(from: From)(using sourceLocation: SourceLocation): Either[Error,To] =
+//        val transformers = transformersForAllFields[
+//          Field.FromLabelsAndTypes[A.MirroredElemLabels, A.MirroredElemTypes],
+//          Field.FromLabelsAndTypes[B.MirroredElemLabels, B.MirroredElemTypes]
+//        ]
+//        unsafeConstructInstance(from) { (labelsToValuesOfA, label) =>
+//          transformers(label)
+//            .asInstanceOf[Mapper[Any, Any]]
+//            .map(labelsToValuesOfA(label.toString)) // TODO create a new SourceLocation based on the label
+//        }
 
   inline def dervied[From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] =
     new Mapper[From, To]:
@@ -151,6 +149,8 @@ object Mapper {
           Field.FromLabelsAndTypes[B.MirroredElemLabels, B.MirroredElemTypes]
         ]
         unsafeConstructInstance(from) { (labelsToValuesOfA, label) =>
+          given SourceLocation = SourceLocation.explicit(label.toString)
+          
           transformers(label)
             .asInstanceOf[Mapper[Any, Any]]
             .map(labelsToValuesOfA(label.toString)) // TODO create a new SourceLocation based on the label
@@ -167,16 +167,15 @@ object DeepUserMappings3 {
 
   given optionMapper[T, S](using mapper: Mapper[T, S]): Mapper[Option[T], S] with {
     def map(value: Option[T])(using sourceLocation: SourceLocation): Either[Error, S] = value match {
-      case Some(v) => mapper.map(v).left.map(error => error.copy(path = sourceLocation.sourceLocation :: error.path))
-      case None => Left(Error("Unable to find value.", List(sourceLocation.sourceLocation)))
+      case Some(v) => mapper.map(v).left.map(error => error.copy(path = sourceLocation :: error.path))
+      case None => Left(Error("Unable to find value.", List(sourceLocation)))
     }
   }
 
   extension [T](inline value: T) {
     inline def as[S](using mapper: Mapper[T, S]): Either[Error, S] = {
-      given SourceLocation with {
-        override val sourceLocation: String = Mappings.sourceCode(value)
-      }
+      given SourceLocation = SourceLocation(value)
+      
       mapper.map(value)
     }
   }
@@ -203,7 +202,6 @@ object DeepUserMappings3 {
 }
 
 object DeepUserMappings4 {
-  import Mapper.given
 
   given idMapper[A]: Mapper[A, A] with {
     def map(value: A)(using sourceLocation: SourceLocation): Either[Error, A] = Right(value)
@@ -211,25 +209,18 @@ object DeepUserMappings4 {
 
   given optionMapper[T, S](using mapper: Mapper[T, S]): Mapper[Option[T], S] with {
     def map(value: Option[T])(using sourceLocation: SourceLocation): Either[Error, S] = value match {
-      case Some(v) => mapper.map(v).left.map(error => error.copy(path = sourceLocation.sourceLocation :: error.path))
-      case None => Left(Error("Unable to find value.", List(sourceLocation.sourceLocation)))
+      case Some(v) => mapper.map(v).left.map(error => error.copy(path = sourceLocation :: error.path))
+      case None => Left(Error("Unable to find value.", List(sourceLocation)))
     }
   }
 
-  given addressMapper: Mapper[ProtoAddress, Address] = Mapper.dervied
-//    with {
-//    def map(source: ProtoAddress)(using sourceLocation: SourceLocation): Either[Error, Address] =
-//      for {
-//        street <- source.street.as[String]
-//        city <- source.city.as[String]
-//      } yield Address(street, city)
-//  }
+  given Mapper[ProtoAddress, Address] = Mapper.dervied
 
+  given Mapper[ProtoUser, DeepUser] = Mapper.dervied
+  
   extension [T](inline value: T) {
     inline def as[S](using mapper: Mapper[T, S]): Either[Error, S] = {
-      given SourceLocation with {
-        override val sourceLocation: String = Mappings.sourceCode(value)
-      }
+      given SourceLocation = SourceLocation(value)
       mapper.map(value)
     }
   }

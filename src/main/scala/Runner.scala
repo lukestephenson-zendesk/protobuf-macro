@@ -1,7 +1,8 @@
 
+import conversion.SourceLocation
 import models.{DeepUserMappings, DeepUserMappings3, DeepUserMappings4, Mappings, Mappings2}
-import source.User as ProtoUser
-import source.Address as ProtoAddress
+import protobuf.User as ProtoUser
+import protobuf.Address as ProtoAddress
 
 object Runner {
   def main(args: Array[String]): Unit = {
@@ -29,6 +30,6 @@ object Runner {
     println("User6 " + errorOrUser6)
 
     val helloVal = "Hello"
-    println(Mappings.sourceCode(helloVal))
+    println(SourceLocation(helloVal))
   }
 }

@@ -1,12 +1,12 @@
 package models
 
-import conversion.Conversions
+import conversion.SourceLocation
 import models.Mappings.expected
-import source.User as ProtoUser
+import protobuf.User as ProtoUser
 
 import scala.quoted.{Expr, Quotes}
 
-case class Error(message: String, path: List[String]) // NonEmptyList[String] ideally
+case class Error(message: String, path: List[SourceLocation]) // NonEmptyList[String] ideally
 
 case class User(name: String, age: Int)
 
@@ -19,17 +19,14 @@ object Mappings {
   }
 
   inline def expected[T](inline value: Option[T]): Either[Error, T] = {
-    val path = sourceCode(value)
+    val path = SourceLocation(value)
 
     value match {
       case Some(v) => Right(v)
       case None => Left(Error("Unable to find value.", List(path)))
     }
   }
-
-  inline def sourceCode(inline value: Any): String =
-    ${Conversions.sourceCode('value)}
-
+  
 }
 
 extension[T] (value: Option[T]) {
