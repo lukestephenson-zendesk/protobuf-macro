@@ -3,8 +3,7 @@ package application.models
 import framework.conversion.SourceLocation
 import scala.quoted.{Expr, Quotes}
 import application.protobuf.{User => ProtoUser}
-
-case class Error(message: String, path: List[SourceLocation]) // NonEmptyList[String] ideally
+import framework.model.Error
 
 case class User(name: String, age: Int)
 

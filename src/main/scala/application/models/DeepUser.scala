@@ -5,6 +5,7 @@ import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
 import scala.quoted.*
 import application.protobuf.{User => ProtoUser, Address => ProtoAddress}
+import framework.model.Error
 
 case class Address(street: String, city: String)
 
@@ -135,7 +136,7 @@ object Mapper {
 //            .map(labelsToValuesOfA(label.toString)) // TODO create a new SourceLocation based on the label
 //        }
 
-  inline def dervied[From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] =
+  inline def derived[From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] =
     new Mapper[From, To]:
       override def map(from: From)(using sourceLocation: SourceLocation): Either[Error,To] =
         val transformers = transformersForAllFields[
@@ -208,9 +209,9 @@ object DeepUserMappings4 {
     }
   }
 
-  given Mapper[ProtoAddress, Address] = Mapper.dervied
+  given Mapper[ProtoAddress, Address] = Mapper.derived
 
-  given Mapper[ProtoUser, DeepUser] = Mapper.dervied
+  given Mapper[ProtoUser, DeepUser] = Mapper.derived
   
   extension [T](inline value: T) {
     inline def as[S](using mapper: Mapper[T, S]): Either[Error, S] = {
