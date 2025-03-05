@@ -4,6 +4,8 @@ import application.models.{Address, DeepUser}
 import application.protobuf.{Address as ProtoAddress, User as ProtoUser}
 import framework.conversion.SourceLocation
 import framework.model.Error
+import kyo.Result
+import kyo.Result.{Failure, Success}
 
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
@@ -58,28 +60,35 @@ object DerivedMapper {
       case _: (Field[label, tpe] *: tail) =>
         transformersForAllFields[FromFields, tail] + transformerForField[label, tpe, FromFields]
 
-  private inline def unsafeConstructInstance[To](from: Product)(unsafeMapper: (Map[String, ?], FieldName) => Either[Error, ?])(using To: Mirror.ProductOf[To]): Either[Error, To] =
+  private inline def unsafeConstructInstance[To](from: Product)(unsafeMapper: (Map[String, ?], FieldName) => Result[Error, ?])(using To: Mirror.ProductOf[To]): Result[Error, To] =
     val labelsToValuesOfFrom: Map[String, Any] = FieldName.wrapAll(from.productElementNames.zip(from.productIterator).toMap)
     val labelIndicesOfTo: Map[FieldName, Int] = labels[To.MirroredElemLabels].zipWithIndex.toMap
     val valueArrayOfTo: Array[Any] = new Array[Any](labelIndicesOfTo.size)
 
-    var failed: Left[Error, ?] = null
+    var failed: Error = null
     var idx = 0
-    while idx < labelIndicesOfTo.size && (failed eq null) do
+    while idx < labelIndicesOfTo.size && (failed == null) do
       val label = labels[To.MirroredElemLabels](idx)
-        unsafeMapper(labelsToValuesOfFrom, label) match
-          case Left(error) => failed = Left(error)
-          case Right(value) => valueArrayOfTo.update(idx, value)
+      val mapperResult = unsafeMapper(labelsToValuesOfFrom, label)
+      
+      mapperResult match {
+        case Success(value) => valueArrayOfTo.update(idx, value)
+        case Failure(e) => failed = e.asInstanceOf[Error]
+      }
+
       idx += 1
     end while
 
-    if failed eq null then Right(To.fromProduct(Tuple.fromArray(valueArrayOfTo)))
-    else failed.asInstanceOf[Either[Error, To]]
+    if failed == null then Result.succeed(To.fromProduct(Tuple.fromArray(valueArrayOfTo)))
+    else failed.asInstanceOf[Result[Error, To]]
 
-  // TODO fix compiler warning here
+
+  // Ignore "New anonymous class definition will be duplicated at each inline site" for the Mapper instances.
+  @annotation.nowarn
   inline def derived[From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] =
     new Mapper[From, To]:
-      override def map(from: From)(using sourceLocation: SourceLocation): Either[Error,To] =
+      override def map(from: From)(using sourceLocation: SourceLocation): Result[Error,To] =
+        println(s"this mapper for ${sourceLocation} is ${this.hashCode()}")
         val transformers = transformersForAllFields[
           Field.FromLabelsAndTypes[A.MirroredElemLabels, A.MirroredElemTypes],
           Field.FromLabelsAndTypes[B.MirroredElemLabels, B.MirroredElemTypes]
@@ -101,8 +110,8 @@ object DeepUserMappings4 {
 
   import Mapper.as
 
-  def fromProto(source2: ProtoUser): Either[Error, DeepUser] = {
-    source2.as[DeepUser]
+  def fromProto(protoUser: ProtoUser): Result[Error, DeepUser] = {
+    protoUser.as[DeepUser]
   }
 }
 
