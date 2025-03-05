@@ -8,6 +8,8 @@ import framework.model.Error
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
 
+// inspired by https://medium.com/scalac/inline-your-boilerplate-harnessing-scala-3-metaprogramming-without-macros-c106ef8d6dfb
+// Mostly modified to propagate SourceLocation and Error explicitly
 sealed trait Field[Label <: String, Type]
 
 object Field:
