@@ -1,10 +1,15 @@
 package application.conversions
 
-import application.models.{Address, DeepUser}
-import application.protobuf.{Address as ProtoAddress, User as ProtoUser}
+import application.models.{Address, DeepUser, NiceUser}
+import application.protobuf.{ProtoAddress, ProtoUser}
+import cats.data.NonEmptyList
 import framework.conversion.SourceLocation
 import framework.model.Error
+import framework.typename.TypeName
+import kyo.Result
+import cats.syntax.all.*
 
+import scala.Tuple.Tail
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
 
@@ -24,9 +29,9 @@ object FieldName:
 
   inline def fromLiteralLabel[Label <: String]: FieldName =
     constValue[Label]
-
-  def wrapAll[K, V](map: Map[K, V]): Map[String, V] =
-    map.asInstanceOf[Map[String, V]]
+//
+//  def wrapAll[K, V](map: Map[K, V]): Map[String, V] =
+//    map.asInstanceOf[Map[String, V]]
 
 object DerivedMapper {
 
@@ -59,17 +64,23 @@ object DerivedMapper {
         transformersForAllFields[FromFields, tail] + transformerForField[label, tpe, FromFields]
 
   private inline def unsafeConstructInstance[To](from: Product)(unsafeMapper: (Map[String, ?], FieldName) => Either[Error, ?])(using To: Mirror.ProductOf[To]): Either[Error, To] =
-    val labelsToValuesOfFrom: Map[String, Any] = FieldName.wrapAll(from.productElementNames.zip(from.productIterator).toMap)
+//    val labelsToValuesOfFrom: Map[String, Any] = FieldName.wrapAll(from.productElementNames.zip(from.productIterator).toMap)
+    val labelsToValuesOfFrom: Map[String, Any] = from.productElementNames.zip(from.productIterator).toMap
     val labelIndicesOfTo: Map[FieldName, Int] = labels[To.MirroredElemLabels].zipWithIndex.toMap
     val valueArrayOfTo: Array[Any] = new Array[Any](labelIndicesOfTo.size)
 
     var failed: Left[Error, ?] = null
+//    var kyoResult: Result[Error, Any] = null
     var idx = 0
+
     while idx < labelIndicesOfTo.size && (failed eq null) do
       val label = labels[To.MirroredElemLabels](idx)
-        unsafeMapper(labelsToValuesOfFrom, label) match
-          case Left(error) => failed = Left(error)
-          case Right(value) => valueArrayOfTo.update(idx, value)
+      unsafeMapper(labelsToValuesOfFrom, label) match
+        case Left(error) => failed = Left(error)
+        case Right(value) => valueArrayOfTo.update(idx, value)
+//      kyoResult match
+//        case Result.Success(value)  => valueArrayOfTo.update(idx, value)
+//        case other =>kyoResult = other
       idx += 1
     end while
 
@@ -91,6 +102,44 @@ object DerivedMapper {
             .asInstanceOf[Mapper[Any, Any]]
             .map(labelsToValuesOfA(label.toString)) // TODO create a new SourceLocation based on the label
         }
+
+  inline def invalid[To <: Product](using A: Mirror.ProductOf[To]): String = {
+    type toTypes = A.MirroredElemTypes
+    type toTypesPlus1 = String *: toTypes
+
+//    type fields = Field.FromLabelsAndTypes[A.MirroredElemLabels, toTypesPlus1]
+
+    TypeName[Field.FromLabelsAndTypes[A.MirroredElemLabels, toTypesPlus1]].value
+  }
+
+  inline def showLabelsAndTypes[To <: Product](using A: Mirror.ProductOf[To]): String = {
+    TypeName[Field.FromLabelsAndTypes[A.MirroredElemLabels, A.MirroredElemTypes]].value
+  }
+
+//  inline def showTransformerForField[()
+}
+
+object ShowTheTypes {
+  def main(args: Array[FieldName]): Unit = {
+    val myTuple: String *: Int *: EmptyTuple = ("hello", 42)
+
+    val tail: Int *: EmptyTuple = myTuple.tail
+
+//    val foo = myTuple.tail.tail
+//    val bar = myTuple.tail.tail.tail.head
+
+    val aTuple = if (true) EmptyTuple else myTuple
+    val aTuple2 = if (true) EmptyTuple else myTuple.tail
+    val foo = (aTuple, aTuple2) match
+      case (labelHead *: labelTail, labelHead2 *: labelTail2) => "something $labelHead2"
+      case (EmptyTuple, EmptyTuple) => "empty"
+
+    println(s"$foo")
+
+    println(DerivedMapper.invalid[NiceUser])
+
+    println(DerivedMapper.showLabelsAndTypes[NiceUser])
+  }
 }
 
 object DeepUserMappings4 {
@@ -103,6 +152,57 @@ object DeepUserMappings4 {
 
   def fromProto(source2: ProtoUser): Either[Error, DeepUser] = {
     source2.as[DeepUser]
+  }
+}
+
+object ErrorMappingExample {
+  case class ProtoResponse(error: Option[ProtoErrors])
+  case class ProtoErrors(messages: List[String])
+
+  case class Response(error: Errors)
+  case class Errors(messages: NonEmptyList[Int])
+
+  given listMapper[T, S](using mapper: Mapper[T, S]): Mapper[List[T], List[S]] with {
+    def map(value: List[T])(using sourceLocation: SourceLocation): Either[Error, List[S]] = {
+      value.zipWithIndex.traverse { (item, index) =>
+        given SourceLocation = sourceLocation.withIndex(index)
+        mapper.map(item)
+      }
+    }
+  }
+
+  given nonEmptyListMapper[T, S](using mapper: Mapper[T, S]): Mapper[List[T], NonEmptyList[S]] with {
+    def map(value: List[T])(using sourceLocation: SourceLocation): Either[Error, NonEmptyList[S]] = {
+      val mappedList = listMapper[T,S].map(value)
+
+      mappedList.flatMap { list =>
+        NonEmptyList.fromList(list) match {
+          case Some(nonEmptyList) => Right(nonEmptyList)
+          case None => Left(Error("List must have 1 or more elements", List(sourceLocation)))
+        }
+      }
+    }
+  }
+
+  given Mapper[String, Int] with {
+    def map(value: String)(using sourceLocation: SourceLocation): Either[Error, Int] = {
+      value.toIntOption match {
+        case Some(intValue) => Right(intValue)
+        case None => Left(Error(s"Unable to parse string $value to int", List(sourceLocation)))
+      }
+    }
+  }
+
+  given Mapper[ProtoResponse, Response] = DerivedMapper.derived
+  given Mapper[ProtoErrors, Errors] = DerivedMapper.derived
+
+  import Mapper.as
+
+  def main(args: Array[FieldName]): Unit = {
+    val protoResponse = ProtoResponse(Some(ProtoErrors(List())))
+    val response = protoResponse.as[Response]
+
+    println(response)
   }
 }
 

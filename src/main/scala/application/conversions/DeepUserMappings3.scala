@@ -1,7 +1,7 @@
 package application.conversions
 
 import application.models.{Address, DeepUser}
-import application.protobuf.{Address as ProtoAddress, User as ProtoUser}
+import application.protobuf.{ProtoAddress, ProtoUser}
 import framework.conversion.SourceLocation
 import framework.model.Error
 

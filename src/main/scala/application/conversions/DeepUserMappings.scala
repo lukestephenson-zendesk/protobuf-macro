@@ -1,21 +1,20 @@
 package application.conversions
 
-import application.models.Mappings.expected
-import application.models.{Address, DeepUser, Mappings}
-import application.protobuf.{Address as ProtoAddress, User as ProtoUser}
+import application.models.{Address, DeepUser}
+import application.protobuf.{ProtoAddress, ProtoUser}
 import framework.conversion.SourceLocation
 import framework.model.Error
 
 object DeepUserMappings {
 
   extension [T](inline value: Option[T]) {
-    inline def expected: Either[Error, T] = Mappings.expected(value)
+    inline def expected: Either[Error, T] = UserMappings1.expected(value)
   }
   
   extension [T, S](value: Option[T]) {
     inline def expectedWith(fn: T => Either[Error, S]): Either[Error, S] = {
       val path = SourceLocation(value)
-      val errorOrProto: Either[Error, T] = Mappings.expected(value)
+      val errorOrProto: Either[Error, T] = UserMappings1.expected(value)
 
       errorOrProto.flatMap { proto =>
         fn(proto).left.map(error => error.copy(path = path :: error.path))

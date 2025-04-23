@@ -9,4 +9,8 @@ object SourceLocation {
     ${ SourceCodeUtil.sourceCode('value) }
     
   inline def explicit(label: String): SourceLocation = label
+  
+  extension (sourceLocation: SourceLocation) {
+    def withIndex(index:Int): SourceLocation = sourceLocation + "[" + index + "]"
+  }
 }
