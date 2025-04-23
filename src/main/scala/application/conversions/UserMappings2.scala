@@ -5,7 +5,7 @@ import application.protobuf.ProtoUser
 import framework.conversion.SourceLocation
 import framework.model.Error
 
-extension[T] (value: Option[T]) {
+extension [T](value: Option[T]) {
   inline def expected: Either[Error, T] = UserMappings1.expected(value)
 }
 

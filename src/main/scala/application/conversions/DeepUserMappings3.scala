@@ -34,7 +34,7 @@ object Mapper {
 
 object DeepUserMappings3 {
   import application.conversions.Mapper.as
-  
+
   given addressMapper: Mapper[ProtoAddress, Address] with {
     def map(source: ProtoAddress)(using sourceLocation: SourceLocation): Either[Error, Address] =
       for {

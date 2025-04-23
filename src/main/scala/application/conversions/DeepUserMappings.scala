@@ -10,15 +10,13 @@ object DeepUserMappings {
   extension [T](inline value: Option[T]) {
     inline def expected: Either[Error, T] = UserMappings1.expected(value)
   }
-  
+
   extension [T, S](value: Option[T]) {
     inline def expectedWith(fn: T => Either[Error, S]): Either[Error, S] = {
       val path = SourceLocation(value)
       val errorOrProto: Either[Error, T] = UserMappings1.expected(value)
 
-      errorOrProto.flatMap { proto =>
-        fn(proto).left.map(error => error.copy(path = path :: error.path))
-      }
+      errorOrProto.flatMap(proto => fn(proto).left.map(error => error.copy(path = path :: error.path)))
     }
   }
 

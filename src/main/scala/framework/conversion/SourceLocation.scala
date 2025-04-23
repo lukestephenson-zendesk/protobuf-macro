@@ -7,10 +7,10 @@ object SourceLocation {
   // and splicing injects the modified AST back into the code.
   inline def apply(inline value: Any): SourceLocation =
     ${ SourceCodeUtil.sourceCode('value) }
-    
+
   inline def explicit(label: String): SourceLocation = label
-  
+
   extension (sourceLocation: SourceLocation) {
-    def withIndex(index:Int): SourceLocation = sourceLocation + "[" + index + "]"
+    def withIndex(index: Int): SourceLocation = sourceLocation + "[" + index + "]"
   }
 }
