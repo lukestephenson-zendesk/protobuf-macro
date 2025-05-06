@@ -1,14 +1,6 @@
 package application
 
-import application.conversions.{
-  DeepUserMappings,
-  DeepUserMappings3,
-  DeepUserMappings4,
-  TraditionalUserMapping,
-  UserMappings1,
-  UserMappings2
-}
-import application.models.*
+import application.conversions.*
 import application.protobuf.*
 import framework.conversion.SourceLocation
 

@@ -1,6 +1,6 @@
 package application.conversions
 
-import application.models.{Address, DeepUser}
+import application.models.{DeepUser, NiceAddress}
 import application.protobuf.{ProtoAddress, ProtoUser}
 import framework.conversion.SourceLocation
 import framework.model.Error
@@ -35,19 +35,19 @@ object Mapper {
 object DeepUserMappings3 {
   import application.conversions.Mapper.as
 
-  given addressMapper: Mapper[ProtoAddress, Address] with {
-    def map(source: ProtoAddress)(using sourceLocation: SourceLocation): Either[Error, Address] =
+  given addressMapper: Mapper[ProtoAddress, NiceAddress] with {
+    def map(source: ProtoAddress)(using sourceLocation: SourceLocation): Either[Error, NiceAddress] =
       for {
         street <- source.street.as[String]
         city <- source.city.as[String]
-      } yield Address(street, city)
+      } yield NiceAddress(street, city)
   }
 
-  def fromProto(source2: ProtoUser): Either[Error, DeepUser] = {
+  def fromProto(source: ProtoUser): Either[Error, DeepUser] = {
     for {
-      name <- source2.name.as[String]
-      age <- source2.age.as[Int]
-      address <- source2.address.as[Address]
+      name <- source.name.as[String]
+      age <- source.age.as[Int]
+      address <- source.address.as[NiceAddress]
     } yield DeepUser(name, age, address)
   }
 }

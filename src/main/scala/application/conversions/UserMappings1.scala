@@ -6,19 +6,17 @@ import framework.conversion.SourceLocation
 import framework.model.Error
 
 object UserMappings1 {
-  def fromProto(source1: ProtoUser): Either[Error, NiceUser] = {
+  def fromProto(source: ProtoUser): Either[Error, NiceUser] = {
     for {
-      name <- expected(source1.name) // source.name.toRight(Error("Unable to find name.", Nil))
-      age <- expected(source1.age)
+      // name <- source.name.toRight(Error("Unable to find name.", Nil))
+      name <- expected(source.name)
+      age <- expected(source.age)
     } yield NiceUser(name, age)
   }
 
-  inline def expected[T](inline value: Option[T]): Either[Error, T] = {
+  inline def expected[T](value: Option[T]): Either[Error, T] = {
     val path = SourceLocation(value)
 
-    value match {
-      case Some(v) => Right(v)
-      case None => Left(Error("Unable to find value.", List(path)))
-    }
+    value.toRight(Error("Unable to find value.", List(path)))
   }
 }

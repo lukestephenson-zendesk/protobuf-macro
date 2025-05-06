@@ -1,20 +1,23 @@
 package application.conversions
 
-import application.models.{Address, DeepUser, NiceUser}
+import application.models.{DeepUser, NiceAddress}
 import application.protobuf.{ProtoAddress, ProtoUser}
 import cats.data.NonEmptyList
+import cats.syntax.all.*
 import framework.conversion.SourceLocation
 import framework.model.Error
-import framework.typename.TypeName
-import kyo.Result
-import cats.syntax.all.*
 
-import scala.Tuple.Tail
+import scala.annotation.nowarn
 import scala.compiletime.{constValue, erasedValue, error, summonInline}
 import scala.deriving.Mirror
 
-// inspired by https://medium.com/scalac/inline-your-boilerplate-harnessing-scala-3-metaprogramming-without-macros-c106ef8d6dfb
+// Credit for this work goes to
+// https://medium.com/scalac/inline-your-boilerplate-harnessing-scala-3-metaprogramming-without-macros-c106ef8d6dfb
 // Mostly modified to propagate SourceLocation and Error explicitly
+
+// Two examples to focus on
+// 1. Extracting the field names and types from a case class
+// 2. Using the above information to find the appropriate mapper for each field
 sealed trait Field[Label <: String, Type]
 
 object Field:
@@ -29,10 +32,8 @@ object FieldName:
 
   inline def fromLiteralLabel[Label <: String]: FieldName =
     constValue[Label]
-//
-//  def wrapAll[K, V](map: Map[K, V]): Map[String, V] =
-//    map.asInstanceOf[Map[String, V]]
 
+//noinspection NoTailRecursionAnnotation
 object DerivedMapper {
 
   private inline def labels[Labels <: Tuple]: List[FieldName] =
@@ -47,7 +48,7 @@ object DerivedMapper {
       FromFields <: Tuple]: (FieldName, Mapper[?, ?]) =
     inline erasedValue[FromFields] match {
       case _: EmptyTuple =>
-        error("Mapper not found for field '" + constValue[ToLabel] + "'")
+        error("Field on target model '" + constValue[ToLabel] + "' was not found on source model")
       case _: (Field[ToLabel, fromType] *: _) =>
         FieldName.fromLiteralLabel[ToLabel] -> summonInline[Mapper[fromType, ToType]]
       case _: (_ *: tail) =>
@@ -63,13 +64,12 @@ object DerivedMapper {
 
   private inline def unsafeConstructInstance[To](from: Product)(unsafeMapper: (Map[String, ?], FieldName) => Either[Error, ?])(using
       To: Mirror.ProductOf[To]): Either[Error, To] =
-//    val labelsToValuesOfFrom: Map[String, Any] = FieldName.wrapAll(from.productElementNames.zip(from.productIterator).toMap)
+
     val labelsToValuesOfFrom: Map[String, Any] = from.productElementNames.zip(from.productIterator).toMap
     val labelIndicesOfTo: Map[FieldName, Int] = labels[To.MirroredElemLabels].zipWithIndex.toMap
     val valueArrayOfTo: Array[Any] = new Array[Any](labelIndicesOfTo.size)
 
     var failed: Left[Error, ?] = null
-//    var kyoResult: Result[Error, Any] = null
     var idx = 0
 
     while idx < labelIndicesOfTo.size && (failed eq null) do
@@ -77,9 +77,6 @@ object DerivedMapper {
       unsafeMapper(labelsToValuesOfFrom, label) match
         case Left(error) => failed = Left(error)
         case Right(value) => valueArrayOfTo.update(idx, value)
-//      kyoResult match
-//        case Result.Success(value)  => valueArrayOfTo.update(idx, value)
-//        case other =>kyoResult = other
       idx += 1
     end while
 
@@ -87,10 +84,11 @@ object DerivedMapper {
     else failed.asInstanceOf[Either[Error, To]]
 
   // TODO fix compiler warning here
-  inline def derived[From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] =
+  @nowarn
+  inline def derived[From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] = {
     new Mapper[From, To]:
       override def map(from: From)(using sourceLocation: SourceLocation): Either[Error, To] =
-        val transformers = transformersForAllFields[
+        val transformers: Map[FieldName, Mapper[?, ?]] = transformersForAllFields[
           Field.FromLabelsAndTypes[A.MirroredElemLabels, A.MirroredElemTypes],
           Field.FromLabelsAndTypes[B.MirroredElemLabels, B.MirroredElemTypes]
         ]
@@ -101,56 +99,57 @@ object DerivedMapper {
             .asInstanceOf[Mapper[Any, Any]]
             .map(labelsToValuesOfA(label.toString)) // TODO create a new SourceLocation based on the label
         }
-
-  inline def invalid[To <: Product](using A: Mirror.ProductOf[To]): String = {
-    type toTypes = A.MirroredElemTypes
-    type toTypesPlus1 = String *: toTypes
-
-//    type fields = Field.FromLabelsAndTypes[A.MirroredElemLabels, toTypesPlus1]
-
-    TypeName[Field.FromLabelsAndTypes[A.MirroredElemLabels, toTypesPlus1]].value
   }
 
-  inline def showLabelsAndTypes[To <: Product](using A: Mirror.ProductOf[To]): String = {
-    TypeName[Field.FromLabelsAndTypes[A.MirroredElemLabels, A.MirroredElemTypes]].value
-  }
+  //  inline def invalid[To <: Product](using A: Mirror.ProductOf[To]): String = {
+//    type toTypes = A.MirroredElemTypes
+//    type toTypesPlus1 = String *: toTypes
+//
+////    type fields = Field.FromLabelsAndTypes[A.MirroredElemLabels, toTypesPlus1]
+//
+//    TypeName[Field.FromLabelsAndTypes[A.MirroredElemLabels, toTypesPlus1]].value
+//  }
+//
+//  inline def showLabelsAndTypes[To <: Product](using A: Mirror.ProductOf[To]): String = {
+//    TypeName[Field.FromLabelsAndTypes[A.MirroredElemLabels, A.MirroredElemTypes]].value
+//  }
 
-//  inline def showTransformerForField[()
 }
 
-object ShowTheTypes {
-  def main(args: Array[FieldName]): Unit = {
-    val myTuple: String *: Int *: EmptyTuple = ("hello", 42)
-
-    val tail: Int *: EmptyTuple = myTuple.tail
-
-//    val foo = myTuple.tail.tail
-//    val bar = myTuple.tail.tail.tail.head
-
-    val aTuple = if (true) EmptyTuple else myTuple
-    val aTuple2 = if (true) EmptyTuple else myTuple.tail
-    val foo = (aTuple, aTuple2) match
-      case (labelHead *: labelTail, labelHead2 *: labelTail2) => "something $labelHead2"
-      case (EmptyTuple, EmptyTuple) => "empty"
-
-    println(s"$foo")
-
-    println(DerivedMapper.invalid[NiceUser])
-
-    println(DerivedMapper.showLabelsAndTypes[NiceUser])
-  }
-}
+//object ShowTheTypes {
+//  def main(args: Array[FieldName]): Unit = {
+//    val myTuple: String *: Int *: EmptyTuple = ("hello", 42)
+//
+//    val tail: Int *: EmptyTuple = myTuple.tail
+//
+//
+////    val foo = myTuple.tail.tail
+////    val bar = myTuple.tail.tail.tail.head
+//
+//    val aTuple = if (true) EmptyTuple else myTuple
+//    val aTuple2 = if (true) EmptyTuple else myTuple.tail
+//    val foo = (aTuple, aTuple2) match
+//      case (labelHead *: labelTail, labelHead2 *: labelTail2) => "something $labelHead2"
+//      case (EmptyTuple, EmptyTuple) => "empty"
+//
+//    println(s"$foo")
+//
+//    println(DerivedMapper.invalid[NiceUser])
+//
+//    println(DerivedMapper.showLabelsAndTypes[NiceUser])
+//  }
+//}
 
 object DeepUserMappings4 {
 
-  given Mapper[ProtoAddress, Address] = DerivedMapper.derived
+  given Mapper[ProtoAddress, NiceAddress] = DerivedMapper.derived
 
   given Mapper[ProtoUser, DeepUser] = DerivedMapper.derived
 
   import Mapper.as
 
-  def fromProto(source2: ProtoUser): Either[Error, DeepUser] = {
-    source2.as[DeepUser]
+  def fromProto(source: ProtoUser): Either[Error, DeepUser] = {
+    source.as[DeepUser]
   }
 }
 
@@ -158,8 +157,8 @@ object ErrorMappingExample {
   case class ProtoResponse(error: Option[ProtoErrors])
   case class ProtoErrors(messages: List[String])
 
-  case class Response(error: Errors)
-  case class Errors(messages: NonEmptyList[Int])
+  case class NiceResponse(error: NiceErrors)
+  case class NiceErrors(messages: NonEmptyList[Int])
 
   given listMapper[T, S](using mapper: Mapper[T, S]): Mapper[List[T], List[S]] with {
     def map(value: List[T])(using sourceLocation: SourceLocation): Either[Error, List[S]] = {
@@ -187,19 +186,20 @@ object ErrorMappingExample {
     def map(value: String)(using sourceLocation: SourceLocation): Either[Error, Int] = {
       value.toIntOption match {
         case Some(intValue) => Right(intValue)
-        case None => Left(Error(s"Unable to parse string $value to int", List(sourceLocation)))
+        case None => Left(Error(s"Unable to parse string '$value' to int", List(sourceLocation)))
       }
     }
   }
 
-  given Mapper[ProtoResponse, Response] = DerivedMapper.derived
-  given Mapper[ProtoErrors, Errors] = DerivedMapper.derived
+  given Mapper[ProtoResponse, NiceResponse] = DerivedMapper.derived
+  given Mapper[ProtoErrors, NiceErrors] = DerivedMapper.derived
 
   import Mapper.as
 
   def main(args: Array[FieldName]): Unit = {
-    val protoResponse = ProtoResponse(Some(ProtoErrors(List())))
-    val response = protoResponse.as[Response]
+    val protoResponse = ProtoResponse(Some(ProtoErrors(List("1", "hello"))))
+//    val protoResponse = ProtoResponse(Some(ProtoErrors(List("1"))))
+    val response = protoResponse.as[NiceResponse]
 
     println(response)
   }

@@ -1,6 +1,6 @@
 package application.conversions
 
-import application.models.{Address, DeepUser, NiceUser}
+import application.models.NiceUser
 import application.protobuf.ProtoUser
 import framework.conversion.SourceLocation
 import framework.model.Error
@@ -11,10 +11,11 @@ extension [T](value: Option[T]) {
 
 object UserMappings2 {
 
-  def fromProto(source2: ProtoUser): Either[Error, NiceUser] = {
+  def fromProto(source: ProtoUser): Either[Error, NiceUser] = {
     for {
-      name <- source2.name.expected
-      age <- source2.age.expected
+      // name <- expected(source.name)
+      name <- source.name.expected
+      age <- source.age.expected
     } yield NiceUser(name, age)
   }
 }
