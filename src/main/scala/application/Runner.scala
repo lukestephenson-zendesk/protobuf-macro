@@ -22,14 +22,14 @@ object Runner {
     val protoUser4 = ProtoUser(name = Some("Luke"), age = Some(35), address = Some(ProtoAddress(street = Some("Main St"), city = None)))
     val errorOrUser4 = DeepUserMappings.fromProto(protoUser4)
     println("User4 " + errorOrUser4)
-
-    val errorOrUser5 = DeepUserMappings3.fromProto(protoUser4)
-    println("User5 " + errorOrUser5)
-
-    val errorOrUser6 = DeepUserMappings4.fromProto(protoUser4)
-    println("User6 " + errorOrUser6)
-
-    val helloVal = "Hello"
-    println(SourceLocation(helloVal))
+//
+//    val errorOrUser5 = DeepUserMappings3.fromProto(protoUser4)
+//    println("User5 " + errorOrUser5)
+//
+//    val errorOrUser6 = DeepUserMappings4.fromProto(protoUser4)
+//    println("User6 " + errorOrUser6)
+//
+//    val helloVal = "Hello"
+//    println(SourceLocation(helloVal))
   }
 }

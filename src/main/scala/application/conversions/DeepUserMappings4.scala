@@ -17,7 +17,14 @@ import scala.deriving.Mirror
 
 // Two examples to focus on
 // 1. Extracting the field names and types from a case class
+// eg For User(name: String, age: Int) we get:
+// labels = (name, age)
+// types = (String, Int)
+// What is easier to work with is:
+// (name: String, age: Int)
 // 2. Using the above information to find the appropriate mapper for each field
+
+
 sealed trait Field[Label <: String, Type]
 
 object Field:
@@ -85,12 +92,12 @@ object DerivedMapper {
 
   // TODO fix compiler warning here
   @nowarn
-  inline def derived[From <: Product, To <: Product](using A: Mirror.ProductOf[From], B: Mirror.ProductOf[To]): Mapper[From, To] = {
+  inline def derived[From <: Product, To <: Product](using mirrorFrom: Mirror.ProductOf[From], mirrorTo: Mirror.ProductOf[To]): Mapper[From, To] = {
     new Mapper[From, To]:
       override def map(from: From)(using sourceLocation: SourceLocation): Either[Error, To] =
         val transformers: Map[FieldName, Mapper[?, ?]] = transformersForAllFields[
-          Field.FromLabelsAndTypes[A.MirroredElemLabels, A.MirroredElemTypes],
-          Field.FromLabelsAndTypes[B.MirroredElemLabels, B.MirroredElemTypes]
+          Field.FromLabelsAndTypes[mirrorFrom.MirroredElemLabels, mirrorFrom.MirroredElemTypes],
+          Field.FromLabelsAndTypes[mirrorTo.MirroredElemLabels, mirrorTo.MirroredElemTypes]
         ]
         unsafeConstructInstance(from) { (labelsToValuesOfA, label) =>
           given SourceLocation = SourceLocation.explicit(label.toString)
@@ -116,29 +123,6 @@ object DerivedMapper {
 
 }
 
-//object ShowTheTypes {
-//  def main(args: Array[FieldName]): Unit = {
-//    val myTuple: String *: Int *: EmptyTuple = ("hello", 42)
-//
-//    val tail: Int *: EmptyTuple = myTuple.tail
-//
-//
-////    val foo = myTuple.tail.tail
-////    val bar = myTuple.tail.tail.tail.head
-//
-//    val aTuple = if (true) EmptyTuple else myTuple
-//    val aTuple2 = if (true) EmptyTuple else myTuple.tail
-//    val foo = (aTuple, aTuple2) match
-//      case (labelHead *: labelTail, labelHead2 *: labelTail2) => "something $labelHead2"
-//      case (EmptyTuple, EmptyTuple) => "empty"
-//
-//    println(s"$foo")
-//
-//    println(DerivedMapper.invalid[NiceUser])
-//
-//    println(DerivedMapper.showLabelsAndTypes[NiceUser])
-//  }
-//}
 
 object DeepUserMappings4 {
 
@@ -207,12 +191,37 @@ object ErrorMappingExample {
 
 object FailuresExample {
   //  // Demo additional fields failure at compilation time
-  //  case class DeepUserAdditionalFields(name: String, age: Int, address: Address, email: String)
+    case class DeepUserAdditionalFields(name: String, age: Int, address: NiceAddress, email: String)
   //
-  //  given Mapper[ProtoUser, DeepUserAdditionalFields] = DerivedMapper.derived
+//    given Mapper[ProtoUser, DeepUserAdditionalFields] = DerivedMapper.derived
   //
-  //  // Demo unhandled field type failure at compilation time
-  //  case class DeepUserUnhandledConversion(name: String, age: Long)
-  //
-  //  given Mapper[ProtoUser, DeepUserUnhandledConversion] = DerivedMapper.derived
+    // Demo unhandled field type failure at compilation time
+    case class DeepUserUnhandledConversion(name: String, age: Long)
+
+//    given Mapper[ProtoUser, DeepUserUnhandledConversion] = DerivedMapper.derived
 }
+
+
+//object ShowTheTypes {
+//  def main(args: Array[FieldName]): Unit = {
+//    val myTuple: String *: Int *: EmptyTuple = ("hello", 42)
+//
+//    val tail: Int *: EmptyTuple = myTuple.tail
+//
+//
+////    val foo = myTuple.tail.tail
+////    val bar = myTuple.tail.tail.tail.head
+//
+//    val aTuple = if (true) EmptyTuple else myTuple
+//    val aTuple2 = if (true) EmptyTuple else myTuple.tail
+//    val foo = (aTuple, aTuple2) match
+//      case (labelHead *: labelTail, labelHead2 *: labelTail2) => "something $labelHead2"
+//      case (EmptyTuple, EmptyTuple) => "empty"
+//
+//    println(s"$foo")
+//
+//    println(DerivedMapper.invalid[NiceUser])
+//
+//    println(DerivedMapper.showLabelsAndTypes[NiceUser])
+//  }
+//}
