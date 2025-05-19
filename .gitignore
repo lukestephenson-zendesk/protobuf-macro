@@ -6,9 +6,10 @@ target/
 .idea
 .bsp
 .metals
-.bsp
-.idea
-.metals
 .DS_Store
 .history
-lib/
+.bsp/
+.bloop/
+project/.bloop/
+.vscode/
+project/project/
